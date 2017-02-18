@@ -52,10 +52,14 @@
 
     function DirectiveController ($scope, $element, $attrs) {
       // Configuration
-      var ngModelController = $element.controller('ngModel')
+      var ngModelController = $element.controller('ngModel'),
+          initialTimeZone
 
       var configuration = createConfiguration()
       $scope.screenReader = configuration.screenReader
+
+      // TODO(jesse): unit test this
+      ngModelController.$parsers.push(unformatValue)
 
       // Behavior
       $scope.changeView = changeView
@@ -361,12 +365,42 @@
         return moment.utc(milliseconds).year(startYear).startOf('year')
       }
 
+      // TODO(jesse): add unit tests for first if block
       function formatValue (timeValue, formatString) {
         if (timeValue) {
-          return getMoment(timeValue).format(formatString)
+          if (!moment.isMoment(timeValue) || !timeValue.tz()) { throw new Error("Valid moment required") }
+          if (!initialTimeZone) { initialTimeZone = timeValue.tz() }
+
+          var datetime = timeValue.format().substring(0, 19)
+          var browserLocalMoment = moment(datetime)
+
+          return browserLocalMoment.format(formatString)
         } else {
           return ''
         }
+      }
+
+      // TODO(jesse): unit test this
+      function unformatValue(modelValue) {
+        return moment.tz(formatDate(modelValue), initialTimeZone)
+      }
+
+      function formatDate(date) {
+        var d = new Date(date),
+          month = '' + (d.getMonth() + 1),
+          day = '' + d.getDate(),
+          year = d.getFullYear(),
+          hours = '' + d.getHours(),
+          minutes = '' + d.getMinutes(),
+          seconds = '' + d.getSeconds()
+
+        if (month.length < 2) month = '0' + month
+        if (day.length < 2) day = '0' + day
+        if (hours.length < 2) hours = '0' + hours
+        if (minutes.length < 2) minutes = '0' + minutes
+        if (seconds.length < 2) seconds = '0' + seconds
+
+        return [year, month, day].join('-') + "T" + [hours, minutes, seconds].join(':')
       }
 
       /**
